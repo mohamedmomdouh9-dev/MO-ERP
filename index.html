@@ -1,68 +1,98 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MO ERP - ARA Gateway</title>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARA mobil - Income Statement</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-*{box-sizing:border-box;font-family:system-ui}body{margin:0;background:#0f172a;color:#fff;padding:16px}
-.card{background:#1e293b;border-radius:16px;padding:16px;margin-bottom:14px}
-h1{margin:0}.muted{color:#94a3b8;font-size:13px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.num{font-size:22px;font-weight:800}.green{color:#4ade80}.red{color:#f87171}
-input,select,button{width:100%;padding:12px;border-radius:10px;border:0;margin-top:8px;font-size:15px}
-input,select{background:#0f172a;color:#fff;border:1px solid #334155}
-button{background:#22c55e;font-weight:800;cursor:pointer}
-table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px;border-bottom:1px solid #334155;text-align:right}
-</style>
-</head>
+*{box-sizing:border-box;font-family:Arial}body{margin:0;background:#f8f8f8;color:#000;padding:12px}
+.card{background:#fff;border:1px solid #000;padding:16px;max-width:700px;margin:auto}
+h2,h3{text-align:center;margin:2px}.center{text-align:center}
+table{width:100%;border-collapse:collapse}td{padding:4px 6px;font-size:14px}
+.num{text-align:right}.total{font-weight:800;border-top:1px solid #000;border-bottom:3px double #000}
+.bold{font-weight:800}
+input,select,button{width:100%;padding:10px;margin-top:6px;border:1px solid #999;border-radius:6px}
+button{background:#000;color:#fff;font-weight:800;cursor:pointer}
+.tabs{display:flex;gap:6px;max-width:700px;margin:0 auto 10px}.tab{flex:1;padding:10px;text-align:center;background:#ddd;cursor:pointer;border-radius:8px}.tab.active{background:#000;color:#fff}
+.pct{text-align:right;color:#555}
+</style></head>
 <body>
-<h1>MO ERP</h1><div class="muted">فرع ARA Gateway - الأرقام التجريبية موجودة</div><br>
-<div class="grid">
-<div class="card"><div class="muted">إجمالي المبيعات</div><div class="num" id="tGross">...</div></div>
-<div class="card"><div class="muted">عمولة فيزا 1.6%</div><div class="num red" id="tComm">...</div></div>
-<div class="card"><div class="muted">الصافي بعد العمولة</div><div class="num green" id="tNet">...</div></div>
-<div class="card"><div class="muted">عدد الفواتير</div><div class="num" id="tCount">...</div></div>
+<div class="tabs"><div class="tab active" id="tb1" onclick="show(1)">Income Statement</div><div class="tab" id="tb2" onclick="show(2)">Add Sale / Expense</div></div>
+
+<div id="p1" class="card">
+<h2>ARA mobil</h2><h3>Income statement</h3>
+<div class="center">for the period <input type="date" id="from" style="width:130px;display:inline"> to <input type="date" id="to" style="width:130px;display:inline"> <button onclick="load()" style="width:auto;padding:6px 14px">Show</button></div>
+<div class="center">with</div>
+<table id="stmt"></table>
+<div style="margin-top:10px"><b>Settings for this period:</b>
+Beg Inventory <input type="number" id="beg" placeholder="92503">
+End Inventory <input type="number" id="end" placeholder="132220">
+Other Income <input type="number" id="oth" placeholder="265083">
+<button onclick="saveSettings()">Save Settings</button></div>
 </div>
-<div class="card"><h3>➕ إضافة بيع جديد</h3>
-<input type="date" id="d"><select id="pm"><option value="visa">فيزا</option><option value="cash">كاش</option></select>
-<input type="number" id="g" placeholder="إجمالي المبلغ">
-<input type="number" id="r" placeholder="مرتجع (0 لو مفيش)" value="0">
-<input type="number" id="c" placeholder="عدد الفواتير" value="1">
-<button onclick="addSale()">حفظ البيع</button><div class="muted" id="msg"></div></div>
-<div class="card"><h3>📋 المبيعات</h3><div id="list">جاري التحميل...</div></div>
+
+<div id="p2" class="card" style="display:none">
+<h3>Add Sale</h3>
+<input type="date" id="d"><select id="pm">
+<option value="visa">Sales Income visa</option><option value="cash">Sales Income cash</option>
+<option value="talabat_cash">Sales Income talabat cash</option><option value="talabat_visa">Sales Income talabat visa</option>
+<option value="botit">Sales Income botit</option><option value="rabbit">Sales Income RABBIT</option></select>
+<input type="number" id="g" placeholder="Amount"><input type="number" id="r" placeholder="Refund" value="0">
+<button onclick="addSale()">Save Sale</button><div id="msg"></div>
+<h3 style="margin-top:20px">Add Expense / Purchase</h3>
+<input type="date" id="ed"><select id="et">
+<option value="purchases">Purchases during period</option><option value="salary">Salary Expense</option>
+<option value="mgmt_salary">Management Salaries</option><option value="rent">Rent Expense</option>
+<option value="transport">Transportation expense</option><option value="social">social insurance expense</option>
+<option value="medical">medical insurance expense</option>
+<option value="maintenance">maintenance expense</option>
+<option value="general">general and administrative exp</option><option value="marketing">marketing exp</option>
+<option value="office">Office exp</option><option value="other_exp">other expense</option></select>
+<input type="number" id="eamt" placeholder="Amount"><button onclick="addExp()">Save Expense</button><div id="emsg"></div>
+</div>
+
 <script>
-const SUPABASE_URL = "https://svtffihjxcktrgrcrnik.supabase.co";
-const SUPABASE_KEY = "sb_publishable_f5pVsV0OGu3Um_u1EFHRLw_WhW6uZ4D";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-let branchId=null;
-async function init(){
-  document.getElementById('d').valueAsDate=new Date();
-  const {data:b}=await sb.from('branches').select('*').eq('name','ARA Gateway').single();
-  if(b) branchId=b.id;
-  load();
-}
+const sb=window.supabase.createClient("https://svtffihjxcktrgrcrnik.supabase.co","sb_publishable_f5pVsV0OGu3Um_u1EFHRLw_WhW6uZ4D");
+let branchId=null; const f=n=>n?n.toLocaleString('en-US',{minimumFractionDigits:2}):'-';
+function show(n){document.getElementById('p1').style.display=n==1?'block':'none';document.getElementById('p2').style.display=n==2?'block':'none';document.getElementById('tb1').classList.toggle('active',n==1);document.getElementById('tb2').classList.toggle('active',n==2)}
+async function init(){document.getElementById('d').valueAsDate=new Date();document.getElementById('ed').valueAsDate=new Date();document.getElementById('from').value='2026-09-01';document.getElementById('to').value='2026-09-30';
+const {data:b}=await sb.from('branches').select('*').eq('name','ARA Gateway').single();branchId=b.id;load();}
 async function load(){
-  const {data,error}=await sb.from('sales').select('*').order('sale_date',{ascending:false});
-  if(error){ document.getElementById('list').textContent='خطأ: '+error.message; return; }
-  let g=0,c=0,n=0,cnt=0; let html='<table><tr><th>التاريخ</th><th>النوع</th><th>إجمالي</th><th>عمولة</th><th>صافي</th></tr>';
-  (data||[]).forEach(s=>{ g+=+s.gross_amount; c+=+s.commission_amount; n+=+s.net_amount; cnt+=+s.receipt_count;
-  html+=`<tr><td>${s.sale_date}</td><td>${s.payment_method}</td><td>${Number(s.gross_amount).toLocaleString()}</td><td>${Number(s.commission_amount).toLocaleString()}</td><td>${Number(s.net_amount).toLocaleString()}</td></tr>`; });
-  html+='</table>'; document.getElementById('list').innerHTML=html;
-  document.getElementById('tGross').textContent=g.toLocaleString();
-  document.getElementById('tComm').textContent=c.toLocaleString();
-  document.getElementById('tNet').textContent=n.toLocaleString();
-  document.getElementById('tCount').textContent=cnt;
+const from=document.getElementById('from').value,to=document.getElementById('to').value;
+const {data:s}=await sb.from('sales').select('*').gte('sale_date',from).lte('sale_date',to);
+const {data:e}=await sb.from('expenses').select('*').gte('expense_date',from).lte('expense_date',to);
+const {data:ps}=await sb.from('period_settings').select('*').eq('branch_id',branchId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+let beg=ps?+ps.beg_inventory:92503, end=ps?+ps.end_inventory:132220, oth=ps?+ps.other_income:265083;
+document.getElementById('beg').value=beg;document.getElementById('end').value=end;document.getElementById('oth').value=oth;
+let sum=m=>{let t=0;(s||[]).forEach(x=>{if(x.payment_method==m)t+=+x.gross_amount});return t};
+let visa=sum('visa'),cash=sum('cash'),tc=sum('talabat_cash'),tv=sum('talabat_visa'),bot=sum('botit'),rab=sum('rabbit');
+let total=visa+cash+tc+tv+bot+rab;
+let visaInt=visa*0.0165;
+let talInt=(tc+tv)*0.35;
+let netSales=total-visaInt-talInt;
+let ex=t=>{let v=0;(e||[]).forEach(x=>{if(x.expense_type==t)v+=+x.amount});return v};
+let purch=ex('purchases'),sal=ex('salary'),mgmt=ex('mgmt_salary'),rent=ex('rent'),trans=ex('transport'),soc=ex('social'),med=ex('medical'),maint=ex('maintenance'),gen=ex('general'),mark=ex('marketing'),off=ex('office'),othExp=ex('other_exp');
+let cogs=beg+purch-end; let gross=netSales-cogs;
+let totOp=sal+mgmt+rent+trans+soc+med+maint+gen; let netAfterOp=gross-totOp;
+let finalNet=netAfterOp+oth-mark-off-othExp;
+let pct=v=>total?((v/total*100).toFixed(2)+'%'):'';
+let R=(label,val,cls='')=>`<tr><td>${label}</td><td class="num">${f(val)}</td><td class="pct">${''}</td></tr>`;
+let html='';
+html+=R('Sales Income visa',visa);html+=R('Sales Income cash',cash);html+=R('Sales Income talabat cash',tc);html+=R('Sales Income talabat visa',tv);html+=R('Sales Income botit',bot);html+=R('Sales Income RABBIT',rab||0);
+html+=`<tr><td class="bold">Total sales</td><td class="num total">${f(total)}</td><td></td></tr>`;
+html+=R('visa interest',visaInt);html+=R('talabat interest',talInt);
+html+=`<tr><td class="bold">Net sales</td><td class="num total">${f(netSales)}</td><td></td></tr>`;
+html+=R('Beg: inventory',beg);html+=R('Purchases during period',purch);html+=R('End: inventory',end);
+html+=`<tr><td class="bold">COGS</td><td class="num bold">${f(cogs)}</td><td class="pct">${pct(cogs)}</td></tr>`;
+html+=`<tr><td class="bold">gross profit</td><td class="num total">${f(gross)}</td><td class="pct">${pct(gross)}</td></tr>`;
+html+=R('Salary Expense',sal);html+=R('Management Salaries',mgmt);html+=R('Rent Expense',rent);html+=R('Transportation expense',trans);html+=R('social insurance expense',soc);html+=R('medical insurance expense',med);html+=R('maintenance expense',maint);html+=R('general and administrative exp',gen);
+html+=`<tr><td class="bold"><u>Total operating expences</u></td><td class="num bold">${f(totOp)}</td><td class="pct">${pct(totOp)}</td></tr>`;
+html+=`<tr><td class="bold">Net profit after operating exp</td><td class="num total">${f(netAfterOp)}</td><td class="pct">${pct(netAfterOp)}</td></tr>`;
+html+=R('+ Other Income',oth);html+=R('marketing exp',mark);html+=R('Office exp',off);html+=R('other expense',othExp);
+html+=`<tr><td class="bold">Net profit (loss)</td><td class="num total">${f(finalNet)}</td><td class="pct">${pct(finalNet)}</td></tr>`;
+document.getElementById('stmt').innerHTML=html;
 }
-async function addSale(){
-  const payload={branch_id:branchId, sale_date:document.getElementById('d').value, payment_method:document.getElementById('pm').value, gross_amount:+document.getElementById('g').value, refund_amount:+document.getElementById('r').value||0, receipt_count:+document.getElementById('c').value||1};
-  if(!payload.gross_amount) return alert('اكتب المبلغ');
-  const {error}=await sb.from('sales').insert(payload);
-  if(error) document.getElementById('msg').textContent='خطأ: '+error.message;
-  else{ document.getElementById('msg').textContent='✅ تم الحفظ والعمولة اتحسبت لوحدها'; document.getElementById('g').value=''; load(); }
-}
+async function addSale(){const p={branch_id:branchId,sale_date:document.getElementById('d').value,payment_method:document.getElementById('pm').value,gross_amount:+document.getElementById('g').value,refund_amount:+document.getElementById('r').value||0,receipt_count:1};const {error}=await sb.from('sales').insert(p);document.getElementById('msg').textContent=error?error.message:'تم';if(!error)load();}
+async function addExp(){const p={branch_id:branchId,expense_date:document.getElementById('ed').value,expense_type:document.getElementById('et').value,category:document.getElementById('et').value,amount:+document.getElementById('eamt').value};const {error}=await sb.from('expenses').insert(p);document.getElementById('emsg').textContent=error?error.message:'تم';if(!error)load();}
+async function saveSettings(){const p={branch_id:branchId,period_start:document.getElementById('from').value,period_end:document.getElementById('to').value,beg_inventory:+document.getElementById('beg').value||0,end_inventory:+document.getElementById('end').value||0,other_income:+document.getElementById('oth').value||0};await sb.from('period_settings').insert(p);alert('تم حفظ إعدادات الفترة');load();}
 init();
-</script>
-</body>
-</html>
+</script></body></html>

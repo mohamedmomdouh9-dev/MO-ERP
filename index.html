@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MO ERP - ARA Gateway</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui}body{margin:0;background:#0f172a;color:#fff;padding:16px}
+.card{background:#1e293b;border-radius:16px;padding:16px;margin-bottom:14px}
+h1{margin:0}.muted{color:#94a3b8;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.num{font-size:22px;font-weight:800}.green{color:#4ade80}.red{color:#f87171}
+input,select,button{width:100%;padding:12px;border-radius:10px;border:0;margin-top:8px;font-size:15px}
+input,select{background:#0f172a;color:#fff;border:1px solid #334155}
+button{background:#22c55e;font-weight:800;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px;border-bottom:1px solid #334155;text-align:right}
+</style>
+</head>
+<body>
+<h1>MO ERP</h1><div class="muted">فرع ARA Gateway - الأرقام التجريبية موجودة</div><br>
+<div class="grid">
+<div class="card"><div class="muted">إجمالي المبيعات</div><div class="num" id="tGross">...</div></div>
+<div class="card"><div class="muted">عمولة فيزا 1.6%</div><div class="num red" id="tComm">...</div></div>
+<div class="card"><div class="muted">الصافي بعد العمولة</div><div class="num green" id="tNet">...</div></div>
+<div class="card"><div class="muted">عدد الفواتير</div><div class="num" id="tCount">...</div></div>
+</div>
+<div class="card"><h3>➕ إضافة بيع جديد</h3>
+<input type="date" id="d"><select id="pm"><option value="visa">فيزا</option><option value="cash">كاش</option></select>
+<input type="number" id="g" placeholder="إجمالي المبلغ">
+<input type="number" id="r" placeholder="مرتجع (0 لو مفيش)" value="0">
+<input type="number" id="c" placeholder="عدد الفواتير" value="1">
+<button onclick="addSale()">حفظ البيع</button><div class="muted" id="msg"></div></div>
+<div class="card"><h3>📋 المبيعات</h3><div id="list">جاري التحميل...</div></div>
+<script>
+const SUPABASE_URL = "https://svtffihjxcktrgrcrnik.supabase.co";
+const SUPABASE_KEY = "sb_publishable_f5pVsV0OGu3Um_u1EFHRLw_WhW6uZ4D";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let branchId=null;
+async function init(){
+  document.getElementById('d').valueAsDate=new Date();
+  const {data:b}=await sb.from('branches').select('*').eq('name','ARA Gateway').single();
+  if(b) branchId=b.id;
+  load();
+}
+async function load(){
+  const {data,error}=await sb.from('sales').select('*').order('sale_date',{ascending:false});
+  if(error){ document.getElementById('list').textContent='خطأ: '+error.message; return; }
+  let g=0,c=0,n=0,cnt=0; let html='<table><tr><th>التاريخ</th><th>النوع</th><th>إجمالي</th><th>عمولة</th><th>صافي</th></tr>';
+  (data||[]).forEach(s=>{ g+=+s.gross_amount; c+=+s.commission_amount; n+=+s.net_amount; cnt+=+s.receipt_count;
+  html+=`<tr><td>${s.sale_date}</td><td>${s.payment_method}</td><td>${Number(s.gross_amount).toLocaleString()}</td><td>${Number(s.commission_amount).toLocaleString()}</td><td>${Number(s.net_amount).toLocaleString()}</td></tr>`; });
+  html+='</table>'; document.getElementById('list').innerHTML=html;
+  document.getElementById('tGross').textContent=g.toLocaleString();
+  document.getElementById('tComm').textContent=c.toLocaleString();
+  document.getElementById('tNet').textContent=n.toLocaleString();
+  document.getElementById('tCount').textContent=cnt;
+}
+async function addSale(){
+  const payload={branch_id:branchId, sale_date:document.getElementById('d').value, payment_method:document.getElementById('pm').value, gross_amount:+document.getElementById('g').value, refund_amount:+document.getElementById('r').value||0, receipt_count:+document.getElementById('c').value||1};
+  if(!payload.gross_amount) return alert('اكتب المبلغ');
+  const {error}=await sb.from('sales').insert(payload);
+  if(error) document.getElementById('msg').textContent='خطأ: '+error.message;
+  else{ document.getElementById('msg').textContent='✅ تم الحفظ والعمولة اتحسبت لوحدها'; document.getElementById('g').value=''; load(); }
+}
+init();
+</script>
+</body>
+</html>

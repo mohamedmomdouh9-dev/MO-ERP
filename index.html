@@ -1,3 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARA MOBIL - Cloud Accounting v3</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;font-family:Arial}body{margin:0;background:#f8f8f8;color:#000;padding:12px}
+.card{background:#fff;border:1px solid #000;padding:16px;max-width:900px;margin:auto}
+h2,h3{text-align:center;margin:4px}.center{text-align:center}
+table{width:100%;border-collapse:collapse}td,th{padding:6px;font-size:13px;border-bottom:1px solid #eee;text-align:left}th{background:#000;color:#fff}
+.num{text-align:right}.total{font-weight:800;border-top:1px solid #000;border-bottom:3px double #000}.bold{font-weight:800}
+input,select,button{width:100%;padding:9px;margin-top:6px;border:1px solid #999;border-radius:6px}
+button{background:#000;color:#fff;font-weight:800;cursor:pointer}
+.tabs{display:flex;gap:4px;max-width:900px;margin:0 auto 10px;flex-wrap:wrap}.tab{flex:1;padding:9px;text-align:center;background:#ddd;cursor:pointer;border-radius:8px;font-size:12px;min-width:90px}.tab.active{background:#000;color:#fff}
+.small{width:auto;padding:4px 8px;font-size:12px;margin:0}.del{background:#c00}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sync{background:#e8f5e9;padding:8px;text-align:center;font-size:12px;border-radius:6px;margin-bottom:8px}
+</style></head>
+<body>
+<div class="sync" id="syncStatus">☁️ Cloud Sync ON - journal_lines</div>
+<div class="tabs">
+<div class="tab active" id="tb1" onclick="show(1)">Journal - اليومية</div>
+<div class="tab" id="tb2" onclick="show(2)">Ledger - الأستاذ</div>
+<div class="tab" id="tb3" onclick="show(3)">Trial Balance</div>
+<div class="tab" id="tb4" onclick="show(4)">P&L - بالنسب</div>
+<div class="tab" id="tb5" onclick="show(5)">Balance Sheet</div>
+<div class="tab" id="tb6" onclick="show(6)">Chart of Accounts</div>
+</div>
+<div id="p1" class="card">
+<h2>ARA MOBIL - Journal Entries</h2>
+<div class="grid"><div>Date<input type="date" id="jdate"></div><div>Amount<input type="number" id="jamt" placeholder="المبلغ"></div></div>
+<div class="grid"><div>Debit - مدين<select id="debit"></select></div><div>Credit - دائن<select id="credit"></select></div></div>
+<input type="text" id="jdesc" placeholder="Description - البيان">
+<button onclick="addJ()">Save - حفظ في الكلاود</button><div id="jmsg" class="center"></div>
+<h3>Quick Entry</h3>
+<div class="grid"><button onclick="quick('sale_visa')">بيع فيزا</button><button onclick="quick('sale_cash')">بيع كاش</button></div>
+<div class="grid"><button onclick="quick('purchase')">شراء بضاعة - Purchases</button><button onclick="quick('rent')">دفع إيجار</button></div>
+<div class="grid"><button onclick="quick('salary')">دفع مرتبات</button><button onclick="quick('collect_visa')">تحصيل فيزا للبنك</button></div>
+<h3>Journal من <input type="date" id="jfrom" style="width:130px;display:inline"> إلى <input type="date" id="jto" style="width:130px;display:inline"> <button onclick="loadData()" style="width:auto">Refresh</button></h3>
+<table><thead><tr><th>Date</th><th>Desc</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th></th></tr></thead><tbody id="jlist"></tbody></table>
+</div>
+<div id="p2" class="card" style="display:none">
+<h2>Ledger - دفتر الأستاذ</h2>
+<div class="center"><select id="ledAcc" style="width:280px;display:inline" onchange="renderLedger()"></select> من <input type="date" id="lfrom" style="width:130px;display:inline"> إلى <input type="date" id="lto" style="width:130px;display:inline"> <button onclick="renderLedger()" style="width:auto">Show</button></div>
+<table><thead><tr><th>Date</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead><tbody id="ledBody"></tbody></table>
+</div>
+<div id="p3" class="card" style="display:none">
+<h2>Trial Balance</h2>
+<div class="center">حتى <input type="date" id="tbDate" style="width:140px;display:inline"> <button onclick="renderAll()" style="width:auto">Show</button></div>
+<table><thead><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead><tbody id="tbBody"></tbody></table><p class="center bold" id="tbCheck"></p>
+</div>
+<div id="p4" class="card" style="display:none">
+<h2>ARA mobil - Income Statement - بالنسب</h2>
+<div class="center">من <input type="date" id="pfrom" style="width:130px;display:inline"> إلى <input type="date" id="pto" style="width:130px;display:inline"> <button onclick="renderPL()" style="width:auto">Show</button></div>
+<table id="plBody"></table>
+<div class="center">Beg Inventory <input type="number" id="begInv" value="282119" style="width:120px;display:inline" onchange="renderPL()"> End Inventory <input type="number" id="endInv" value="89095" style="width:120px;display:inline" onchange="renderPL()"></div>
+</div>
+<div id="p5" class="card" style="display:none">
+<h2>ARA MOBIL - Statement of Financial Position</h2>
+<div class="center">at <input type="date" id="bdate" style="width:140px;display:inline"> <button onclick="renderBS()" style="width:auto">Show</button></div>
+<table id="bsBody"></table>
+</div>
+<div id="p6" class="card" style="display:none">
+<h2>Chart of Accounts - الصح</h2>
+<table><thead><tr><th>ID</th><th>Account</th><th>Type</th></tr></thead><tbody id="coaBody"></tbody></table>
+</div>
+<script>
+const sb=window.supabase.createClient("https://svtffihjxcktrgrcrnik.supabase.co","sb_publishable_f5pVsV0OGu3Um_u1EFHRLw_WhW6uZ4D");
+let COA=[
+[1001,"Cash on Hand","Asset"],[1002,"masr Bank","Asset"],[1004,"Inventory","Asset"],[1005,"provision","Asset"],[1006,"A/R ( mobil)","Asset"],[1007,"A/R ( visa)","Asset"],[1008,"A/R ( talabat visa )","Asset"],[1009,"Property, Plant & Equipment","Asset"],[1012,"custody ramy center","Asset"],[1013,"A/R (BOTIT)","Asset"],[1014,"A/R (Rabbit)","Asset"],[1015,"zaid","Asset"],[1016,"telal","Asset"],[1017,"up town","Asset"],[1018,"khema remadan","Asset"],[1019,"income tax","Asset"],[1020,"A/R (Breadfast)","Asset"],[1021,"VAT","Asset"],[1023,"custody ramy","Asset"],[1024,"custody gasser","Asset"],[1025,"madinaty","Liability"],
+[2001,"A/P ( suppliers )","Liability"],[2002,"Accrued expense","Liability"],[2003,"shorta","Liability"],[2004,"marghany","Liability"],[2005,"maadi","Liability"],[2006,"nasrcity","Liability"],[2007,"gateway","Liability"],
+[3001,"owners Equity","Equity"],[3003,"Drawings Ahmed khalil","Equity"],[3004,"Drawings Ahmed hamdy","Equity"],[3005,"Drawings Gasser magdy","Equity"],
+[4001,"Sales Income visa","Revenue"],[4002,"Sales Income cash","Revenue"],[4003,"Sales Income talabat cash","Revenue"],[4004,"Sales Income talabat visa","Revenue"],[4005,"Sales Income botit","Revenue"],[4006,"Sales Income RABBIT","Revenue"],[4007,"sales income Breadfast","Revenue"],[4008,"Other Income","Revenue"],
+[5001,"Salary Expense","Expense"],[5002,"Management Salaries","Expense"],[5003,"Rent Expense","Expense"],[5004,"Transportation expense","Expense"],[5005,"social insurance expense","Expense"],[5006,"medical insurance expense","Expense"],[5007,"maintenance expense","Expense"],[5008,"general and administrative exp","Expense"],[5009,"marketing exp","Expense"],[5010,"Office exp","Expense"],[5011,"other expense","Expense"],[5012,"center exp","Expense"],[5013,"visa interest","Expense"],[5014,"talabat interest","Expense"],[5015,"Purchases","Expense"]
+];
+let J=[];
+const f=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function show(n){[1,2,3,4,5,6].forEach(i=>{document.getElementById('p'+i).style.display=n==i?'block':'none';document.getElementById('tb'+i).classList.toggle('active',n==i)});renderAll();}
+function fillSelects(){let h=COA.map(c=>`<option value="${c[1]}">${c[0]} - ${c[1]}</option>`).join('');document.getElementById('debit').innerHTML=h;document.getElementById('credit').innerHTML=h;document.getElementById('ledAcc').innerHTML=h;}
+async function loadData(){
+document.getElementById('syncStatus').textContent='⏳ جاري التحميل...';
+let all=[],from=0;while(true){let {data,error}=await sb.from('journal_lines').select('*').order('entry_date').range(from,from+999);if(error){document.getElementById('syncStatus').textContent='❌ '+error.message;return;}all=all.concat(data||[]);if(!data||data.length<1000)break;from+=1000;}
+J=all.map(r=>({id:r.id,entry_id:r.entry_id,date:r.entry_date,desc:r.description||'',account:r.account,debit:+r.debit||0,credit:+r.credit||0}));
+document.getElementById('syncStatus').textContent='☁️ Cloud Sync ON - '+J.length+' سطر - أي تعديل هيسمع في كل الأجهزة ✅';
+renderAll();}
+async function addJ(){let amt=+document.getElementById('jamt').value,dr=document.getElementById('debit').value,cr=document.getElementById('credit').value;
+if(!amt||dr==cr){document.getElementById('jmsg').textContent='المبلغ لازم > 0 والمدين غير الدائن';return;}
+let eid='NEW-'+Date.now();let date=document.getElementById('jdate').value,desc=document.getElementById('jdesc').value||'';
+let {error}=await sb.from('journal_lines').insert([{entry_id:eid,entry_date:date,description:desc,account:dr,debit:amt,credit:0},{entry_id:eid,entry_date:date,description:desc,account:cr,debit:0,credit:amt}]);
+if(error){document.getElementById('jmsg').textContent=error.message;return;}
+document.getElementById('jmsg').textContent='تم الحفظ في الكلاود ✅';document.getElementById('jamt').value='';document.getElementById('jdesc').value='';loadData();}
+async function quick(type){let amt=prompt('المبلغ؟');if(!amt)return;let d=new Date().toISOString().slice(0,10);let p=null;
+if(type=='sale_visa')p=['A/R ( visa)','Sales Income visa','بيع فيزا'];
+if(type=='sale_cash')p=['Cash on Hand','Sales Income cash','بيع كاش'];
+if(type=='purchase')p=['Purchases','A/P ( suppliers )','شراء بضاعة'];
+if(type=='rent')p=['Rent Expense','masr Bank','إيجار'];
+if(type=='salary')p=['Salary Expense','masr Bank','مرتبات'];
+if(type=='collect_visa')p=['masr Bank','A/R ( visa)','تحصيل فيزا للبنك'];
+if(p){let eid='NEW-'+Date.now();await sb.from('journal_lines').insert([{entry_id:eid,entry_date:d,description:p[2],account:p[0],debit:+amt,credit:0},{entry_id:eid,entry_date:d,description:p[2],account:p[1],debit:0,credit:+amt}]);loadData();}}
+async function delEntry(eid){if(!confirm('تمسح القيد كله؟'))return;await sb.from('journal_lines').delete().eq('entry_id',eid);loadData();}
+function balances(upTo){let bal={};COA.forEach(c=>bal[c[1]]=0);J.forEach(j=>{if(upTo&&j.date>upTo)return;bal[j.account]=(bal[j.account]||0)+j.debit-j.credit;});return bal;}
+function balancesPeriod(from,to){let bal={};COA.forEach(c=>bal[c[1]]=0);J.forEach(j=>{if(j.date<from||j.date>to)return;bal[j.account]=(bal[j.account]||0)+j.debit-j.credit;});return bal;}
+function renderAll(){renderJournal();renderLedger();renderTB();renderPL();renderBS();renderCOA();}
+function renderJournal(){let from=document.getElementById('jfrom').value,to=document.getElementById('jto').value;let html='';let seen={};J.forEach(j=>{if(j.date<from||j.date>to)return;let btn='';if(!seen[j.entry_id]){seen[j.entry_id]=1;btn=`<button class="small del" onclick="delEntry('${j.entry_id}')">Delete</button>`;}html+=`<tr><td>${j.date}</td><td>${j.desc}</td><td>${j.account}</td><td class="num">${j.debit?f(j.debit):''}</td><td class="num">${j.credit?f(j.credit):''}</td><td>${btn}</td></tr>`;});document.getElementById('jlist').innerHTML=html||'<tr><td>لا يوجد</td></tr>';}
+function renderLedger(){let acc=document.getElementById('ledAcc').value,from=document.getElementById('lfrom').value,to=document.getElementById('lto').value;let bal=0,html='';
+J.forEach(j=>{if(j.date>=from)return;if(j.account==acc)bal+=j.debit-j.credit;});
+html+=`<tr><td>${from}</td><td>رصيد أول</td><td></td><td></td><td class="num bold">${f(bal)}</td></tr>`;
+J.filter(j=>j.date>=from&&j.date<=to&&j.account==acc).forEach(j=>{bal+=j.debit-j.credit;html+=`<tr><td>${j.date}</td><td>${j.desc}</td><td class="num">${j.debit?f(j.debit):''}</td><td class="num">${j.credit?f(j.credit):''}</td><td class="num">${f(bal)}</td></tr>`;});
+document.getElementById('ledBody').innerHTML=html;}
+function renderTB(){let upTo=document.getElementById('tbDate').value;let bal=balances(upTo);let html='',totD=0,totC=0;COA.forEach(c=>{let v=bal[c[1]]||0;if(Math.abs(v)<0.01)return;if(v>0){html+=`<tr><td>${c[1]}</td><td class="num">${f(v)}</td><td></td><td class="num">${f(v)}</td></tr>`;totD+=v;}else{html+=`<tr><td>${c[1]}</td><td></td><td class="num">${f(-v)}</td><td class="num">${f(v)}</td></tr>`;totC+=-v;}});html+=`<tr><td class="bold">TOTAL</td><td class="num total">${f(totD)}</td><td class="num total">${f(totC)}</td><td class="num total">${f(totD-totC)}</td></tr>`;document.getElementById('tbBody').innerHTML=html;document.getElementById('tbCheck').textContent=Math.abs(totD-totC)<0.01?'✅ موزون':'⚠️ فرق '+f(totD-totC);}
 function renderPL(){
 let from=document.getElementById('pfrom').value,to=document.getElementById('pto').value;
 let b=balancesPeriod(from,to);let get=a=>b[a]||0;
@@ -9,8 +117,8 @@ let op=get("Salary Expense")+get("Management Salaries")+get("Rent Expense")+get(
 let afterOp=gross-op,other=-get("Other Income"),final=afterOp+other-get("marketing exp")-get("Office exp")-get("other expense")-get("center exp");
 let pct=v=> net? (v/net*100).toFixed(1)+'%' : '0.0%';
 let R=(l,v,showPct=true)=>`<tr><td>${l}</td><td class="num">${f(v)}</td><td class="num">${showPct?pct(v):''}</td></tr>`;
-let H=`<tr><th>Item</th><th class="num">Amount</th><th class="num">% of Net Sales</th></tr>`;
-let h=H+R('Total sales',sales)+R('visa interest',visaInt)+R('talabat interest',talInt)+`<tr><td class="bold">Net sales</td><td class="num total">${f(net)}</td><td class="num total">100.0%</td></tr>`+R('Beg: inventory',begInv,false)+R('Purchases',purch)+R('End: inventory',-endInv,false)+`<tr><td class="bold">COGS</td><td class="num bold">${f(cogs)}</td><td class="num bold">${pct(cogs)}</td></tr>`+`<tr><td class="bold">gross profit - هامش الربح</td><td class="num total">${f(gross)}</td><td class="num total">${pct(gross)}</td></tr>`+R('Salary Expense',get("Salary Expense"))+R('Management Salaries',get("Management Salaries"))+R('Rent Expense',get("Rent Expense"))+R('Transportation expense',get("Transportation expense"))+R('social insurance expense',get("social insurance expense"))+R('medical insurance expense',get("medical insurance expense"))+R('maintenance expense',get("maintenance expense"))+R('general and administrative exp',get("general and administrative exp"))+`<tr><td class="bold">Total operating</td><td class="num bold">${f(op)}</td><td class="num bold">${pct(op)}</td></tr>`+`<tr><td class="bold">Net profit after operating</td><td class="num total">${f(afterOp)}</td><td class="num total">${pct(afterOp)}</td></tr>`+R('+ Other Income',other)+R('marketing exp',get("marketing exp"))+R('Office exp',get("Office exp"))+R('other expense',get("other expense"))+R('center exp',get("center exp"))+`<tr><td class="bold">Net profit (loss) - صافي الربح</td><td class="num total">${f(final)}</td><td class="num total">${pct(final)}</td></tr>`;
+let h=`<tr><th>Item</th><th class="num">Amount</th><th class="num">% of Net Sales</th></tr>`;
+h+=R('Total sales',sales)+R('visa interest',visaInt)+R('talabat interest',talInt)+`<tr><td class="bold">Net sales</td><td class="num total">${f(net)}</td><td class="num total">100.0%</td></tr>`+R('Beg: inventory',begInv,false)+R('Purchases',purch)+R('End: inventory',-endInv,false)+`<tr><td class="bold">COGS</td><td class="num bold">${f(cogs)}</td><td class="num bold">${pct(cogs)}</td></tr>`+`<tr><td class="bold">gross profit</td><td class="num total">${f(gross)}</td><td class="num total">${pct(gross)}</td></tr>`+R('Salary Expense',get("Salary Expense"))+R('Management Salaries',get("Management Salaries"))+R('Rent Expense',get("Rent Expense"))+R('Transportation expense',get("Transportation expense"))+R('social insurance expense',get("social insurance expense"))+R('medical insurance expense',get("medical insurance expense"))+R('maintenance expense',get("maintenance expense"))+R('general and administrative exp',get("general and administrative exp"))+`<tr><td class="bold">Total operating</td><td class="num bold">${f(op)}</td><td class="num bold">${pct(op)}</td></tr>`+`<tr><td class="bold">Net profit after operating</td><td class="num total">${f(afterOp)}</td><td class="num total">${pct(afterOp)}</td></tr>`+R('+ Other Income',other)+R('marketing exp',get("marketing exp"))+R('Office exp',get("Office exp"))+R('other expense',get("other expense"))+R('center exp',get("center exp"))+`<tr><td class="bold">Net profit (loss)</td><td class="num total">${f(final)}</td><td class="num total">${pct(final)}</td></tr>`;
 document.getElementById('plBody').innerHTML=h;
 }
 function renderBS(){
@@ -18,7 +126,6 @@ let upTo=document.getElementById('bdate').value;let bal=balances(upTo);let pb=ba
 let sales=-(get("Sales Income visa")+get("Sales Income cash")+get("Sales Income talabat cash")+get("Sales Income talabat visa")+get("Sales Income botit")+get("Sales Income RABBIT")+get("sales income Breadfast"));
 let net=sales-get("visa interest")-get("talabat interest");let cogs=(+document.getElementById('begInv').value||282119)+get("Purchases")-(+document.getElementById('endInv').value||89095);let gross=net-cogs;let op=get("Salary Expense")+get("Management Salaries")+get("Rent Expense")+get("Transportation expense")+get("social insurance expense")+get("medical insurance expense")+get("maintenance expense")+get("general and administrative exp");let final=gross-op+(-get("Other Income"))-get("marketing exp")-get("Office exp")-get("other expense")-get("center exp");
 let R=(l,v)=>`<tr><td>${l}</td><td class="num">${f(v)}</td></tr>`;
-// Reclass: لو العميل سالب يروح خصوم، ولو المورد سالب يروح أصول
 let assetsMap={};let liabsMap={};
 let assetNames=["Cash on Hand","masr Bank","A/R ( mobil)","A/R ( visa)","A/R ( talabat visa )","A/R (BOTIT)","A/R (Rabbit)","A/R (Breadfast)","Inventory","provision","Property, Plant & Equipment","custody ramy center","custody ramy","custody gasser","zaid","telal","up town","khema remadan","income tax","VAT"];
 let liabNames=["A/P ( suppliers )","Accrued expense","shorta","marghany","maadi","madinaty","nasrcity","gateway"];
@@ -33,6 +140,8 @@ h+=`<tr><td class="bold">Equity</td><td></td></tr>`;equity.forEach(a=>{let v=-(b
 h+=R('Net profit (Current Period)',final);totE+=final;h+=`<tr><td class="bold">TOTAL Liabilities + Equity</td><td class="num total">${f(totL+totE)}</td></tr><tr><td class="bold">Difference (لازم 0)</td><td class="num">${f(totA-(totL+totE))}</td></tr>`;
 document.getElementById('bsBody').innerHTML=h;
 }
+function renderCOA(){document.getElementById('coaBody').innerHTML=COA.map(c=>`<tr><td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td></tr>`).join('');}
+fillSelects();
 let d=new Date();document.getElementById('jdate').valueAsDate=d;
 document.getElementById('jfrom').value='2026-11-01';document.getElementById('jto').value='2026-11-30';
 document.getElementById('lfrom').value='2026-01-01';document.getElementById('lto').value='2026-11-30';
